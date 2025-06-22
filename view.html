@@ -356,8 +356,8 @@
       <div class="company-header">
         <div class="company-info-block">
           <p><strong>WeCloud Internet Services</strong></p>
-          <p>123 Business Avenue, Tech District</p>
-          <p>Karachi, Pakistan</p>
+          <p>Main Bazar, Aari Syedan</p>
+          <p>Islamabad, Pakistan</p>
           <p>support@wecloud.com</p>
           <p>+92-300-1234567</p>
         </div>
@@ -442,7 +442,7 @@
         <p>For any questions regarding this invoice, please contact our support team.</p>
         <div class="company-info">
           <p>Email: support@wecloud.com | Phone: +92-300-1234567</p>
-          <p>Address: 123 Business Avenue, Tech District, Karachi, Pakistan</p>
+          <p>Address: Main Bazar, Aari Syedan, Islamabad, Pakistan</p>
         </div>
       </div>
     </div>
@@ -526,10 +526,39 @@
 
         // Debug logging for invoice data
         console.log('Invoice data:', invoice);
-        console.log('CreatedAt type:', invoice.createdAt ? typeof invoice.createdAt : 'undefined');
-        if (invoice.createdAt) {
-          console.log('CreatedAt value:', invoice.createdAt);
-          console.log('Has toDate method:', typeof invoice.createdAt.toDate === 'function');
+        
+        // Fetch user details if userId is available
+        let user = null;
+        if (invoice.userId) {
+          try {
+            console.log('Fetching user with ID:', invoice.userId);
+            const userDoc = await db.collection("users").doc(invoice.userId).get();
+            if (userDoc.exists) {
+              user = userDoc.data();
+              console.log('User data:', user);
+            } else {
+              console.log('No user found with ID:', invoice.userId);
+            }
+          } catch (userError) {
+            console.error('Error fetching user:', userError);
+          }
+        }
+        
+        // Fetch package details if packageId is available
+        let packageData = null;
+        if (invoice.packageId) {
+          try {
+            console.log('Fetching package with ID:', invoice.packageId);
+            const packageDoc = await db.collection("packages").doc(invoice.packageId).get();
+            if (packageDoc.exists) {
+              packageData = packageDoc.data();
+              console.log('Package data:', packageData);
+            } else {
+              console.log('No package found with ID:', invoice.packageId);
+            }
+          } catch (packageError) {
+            console.error('Error fetching package:', packageError);
+          }
         }
         
         // Populate invoice details
@@ -620,14 +649,25 @@
         }
         document.getElementById('dueDate').textContent = dueDate ? dueDate.toLocaleDateString() : 'N/A';
         
-        // Customer details
-        document.getElementById('customerName').textContent = invoice.customerName || 'Customer Name';
-        document.getElementById('customerPhone').textContent = invoice.customerPhone ? `📞 ${invoice.customerPhone}` : '';
-        document.getElementById('customerEmail').textContent = invoice.customerEmail ? `✉️ ${invoice.customerEmail}` : '';
-        document.getElementById('customerAddress').textContent = invoice.customerAddress || '';
+        // Customer details - use user data if available, otherwise fall back to invoice data
+        if (user) {
+          document.getElementById('customerName').textContent = user.name || 'Customer Name';
+          document.getElementById('customerPhone').textContent = user.phone ? `📞 ${user.phone}` : '';
+          document.getElementById('customerEmail').textContent = user.email ? `✉️ ${user.email}` : '';
+          document.getElementById('customerAddress').textContent = user.address || '';
+        } else {
+          document.getElementById('customerName').textContent = invoice.customerName || 'Customer Name';
+          document.getElementById('customerPhone').textContent = invoice.customerPhone ? `📞 ${invoice.customerPhone}` : '';
+          document.getElementById('customerEmail').textContent = invoice.customerEmail ? `✉️ ${invoice.customerEmail}` : '';
+          document.getElementById('customerAddress').textContent = invoice.customerAddress || '';
+        }
 
-        // Package details
-        document.getElementById('packageName').textContent = invoice.packageName || 'Service';
+        // Package details - use package data if available, otherwise fall back to invoice data
+        if (packageData) {
+          document.getElementById('packageName').textContent = packageData.name || 'Service';
+        } else {
+          document.getElementById('packageName').textContent = invoice.packageName || 'Service';
+        }
         
         // Format billing period
         let periodText = 'N/A';

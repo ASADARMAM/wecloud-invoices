@@ -11,7 +11,7 @@ const messageTemplates = {
 
 Thank you for your payment! 🙏
 
-Your receipt for WeCloud Internet Services is now available.
+A receipt has been generated for your WeCloud Internet Services payment.
 
 *Receipt Details:*
 📋 Invoice #: {invoiceId}

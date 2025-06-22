@@ -139,6 +139,14 @@
       font-weight: bold;
     }
     
+    .status-due {
+      background-color: #fff8e1;
+      color: #f57c00;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    
     .paid-stamp {
       position: absolute;
       top: 50%;
@@ -498,19 +506,41 @@
 
         // Package details
         document.getElementById('packageName').textContent = invoice.packageName || 'Service';
-        document.getElementById('billingPeriod').textContent = invoice.period || 'N/A';
+        
+        // Format billing period
+        let periodText = 'N/A';
+        if (invoice.billingPeriod) {
+          periodText = invoice.billingPeriod;
+        } else if (invoice.period) {
+          periodText = invoice.period;
+        } else if (invoiceDate && dueDate) {
+          // If we have both dates, create a period from them
+          periodText = `${invoiceDate.toLocaleDateString()} - ${dueDate.toLocaleDateString()}`;
+        } else if (invoice.formattedId && invoice.formattedId.length >= 6) {
+          // Try to derive period from invoice ID (YYYYMM)
+          const yr = invoice.formattedId.substring(0,4);
+          const mo = invoice.formattedId.substring(4,6);
+          periodText = `${mo}/${yr}`;
+        }
+        document.getElementById('billingPeriod').textContent = periodText;
+        
         document.getElementById('packageAmount').textContent = `PKR ${parseFloat(invoice.amount || 0).toFixed(2)}`;
 
         // Total amount
         document.getElementById('totalAmount').textContent = `PKR ${parseFloat(invoice.amount || 0).toFixed(2)}`;
 
         // Update payment status
-        document.getElementById('invoiceStatus').textContent = invoice.status || 'Due';
-        document.getElementById('invoiceStatus').className = `status-${(invoice.status || 'unpaid').toLowerCase()}`;
+        const status = invoice.status || 'Due';
+        document.getElementById('invoiceStatus').textContent = status.toUpperCase();
         
-        // Show paid stamp if paid
-        if (invoice.status && invoice.status.toLowerCase() === 'paid') {
+        // Set the correct status class
+        if (status.toLowerCase() === 'paid') {
+          document.getElementById('invoiceStatus').className = 'status-paid';
           document.getElementById('paidStamp').style.display = 'block';
+        } else if (status.toLowerCase() === 'due') {
+          document.getElementById('invoiceStatus').className = 'status-due';
+        } else {
+          document.getElementById('invoiceStatus').className = 'status-unpaid';
         }
         
         // Show the invoice container and hide loading indicator

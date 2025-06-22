@@ -4,14 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Invoice - WeCloud Internet Services</title>
+  <!-- Cache control -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-app-compat.js?v=1.2"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore-compat.js?v=1.2"></script>
   <!-- jsPDF for PDF generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js?v=1.2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js?v=1.2"></script>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -34,6 +38,7 @@
       background-color: #fff;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       border-radius: 10px;
+      position: relative;
     }
     
     .invoice-header {
@@ -134,6 +139,22 @@
       font-weight: bold;
     }
     
+    .paid-stamp {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      border: 5px solid #4CAF50;
+      color: #4CAF50;
+      padding: 10px 40px;
+      font-size: 48px;
+      font-weight: bold;
+      text-transform: uppercase;
+      opacity: 0.8;
+      z-index: 10;
+      display: none;
+    }
+    
     .loading {
       text-align: center;
       padding: 40px;
@@ -218,6 +239,7 @@
     <div id="errorContainer" class="error" style="display: none;"></div>
     
     <div id="invoiceContainer" class="invoice-container" style="display: none;">
+      <div id="paidStamp" class="paid-stamp">PAID</div>
       <div class="invoice-header">
         <div class="invoice-logo">
           <img src="https://asadarmam.github.io/wecloud-invoices/assets/logo.svg" alt="WeCloud Logo" id="companyLogo">
@@ -301,214 +323,217 @@
     <p>&copy; 2023 WeCloud Internet Services. All rights reserved.</p>
   </footer>
 
-  <script>
-    // Initialize Firebase
+  <script type="module">
+    // Import Firebase modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js?v=1.2";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js?v=1.2";
+
+    // Your web app's Firebase configuration
     const firebaseConfig = {
-      apiKey: "AIzaSyAExSaJx0_YU_ZkXcGqkAiDtgljo8cPJRQ",
-      authDomain: "ispnet-6ab93.firebaseapp.com",
-      projectId: "ispnet-6ab93",
-      storageBucket: "ispnet-6ab93.firebasestorage.app",
-      messagingSenderId: "332292008834",
-      appId: "1:332292008834:web:60adaaee92ff9899363d9b",
-      measurementId: "G-L3084YL4ZL"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
-    
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    
-    // DOM Elements
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    const errorContainer = document.getElementById('errorContainer');
-    const invoiceContainer = document.getElementById('invoiceContainer');
-    const invoiceStatus = document.getElementById('invoiceStatus');
-    const invoiceNumber = document.getElementById('invoiceNumber');
-    const invoiceDate = document.getElementById('invoiceDate');
-    const dueDate = document.getElementById('dueDate');
-    const customerName = document.getElementById('customerName');
-    const customerPhone = document.getElementById('customerPhone');
-    const customerEmail = document.getElementById('customerEmail');
-    const customerAddress = document.getElementById('customerAddress');
-    const packageName = document.getElementById('packageName');
-    const billingPeriod = document.getElementById('billingPeriod');
-    const packageAmount = document.getElementById('packageAmount');
-    const totalAmount = document.getElementById('totalAmount');
-    const printBtn = document.getElementById('printBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const companyLogo = document.getElementById('companyLogo');
-    
-    // Event listeners
-    document.addEventListener('DOMContentLoaded', () => {
-      // Get invoice ID from URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const invoiceId = urlParams.get('id');
-      
-      if (invoiceId) {
-        loadInvoice(invoiceId);
-      } else {
-        showError('No invoice ID provided. Please check the URL.');
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Get invoice ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const invoiceId = urlParams.get('id');
+    // Check if a date parameter is provided in the URL
+    const urlDate = urlParams.get('date');
+    let urlProvidedDate = null;
+    if (urlDate) {
+      try {
+        urlProvidedDate = new Date(urlDate);
+        console.log('URL provided date:', urlProvidedDate);
+      } catch (e) {
+        console.error('Invalid date format in URL:', urlDate);
       }
-      
-      // Button event listeners
-      printBtn.addEventListener('click', printInvoice);
-      downloadBtn.addEventListener('click', downloadInvoice);
+    }
+
+    // Set up event listeners
+    document.getElementById('printBtn').addEventListener('click', () => {
+      window.print();
     });
     
-    // Load invoice data
-    async function loadInvoice(invoiceId) {
-      try {
-        // Get invoice data
-        const invoiceDoc = await db.collection('invoices').doc(invoiceId).get();
-        
-        if (!invoiceDoc.exists) {
-          showError('Invoice not found. Please check the invoice ID.');
-          return;
-        }
-        
-        const invoice = { id: invoiceDoc.id, ...invoiceDoc.data() };
-        
-        // Get user data
-        const userDoc = await db.collection('users').doc(invoice.userId).get();
-        if (!userDoc.exists) {
-          showError('User information not found for this invoice.');
-          return;
-        }
-        const user = { id: userDoc.id, ...userDoc.data() };
-        
-        // Get package data
-        const packageDoc = await db.collection('packages').doc(invoice.packageId).get();
-        if (!packageDoc.exists) {
-          showError('Package information not found for this invoice.');
-          return;
-        }
-        const packageData = { id: packageDoc.id, ...packageDoc.data() };
-        
-        // Update UI with invoice data
-        updateInvoiceUI(invoice, user, packageData);
-        
-        // Hide loading indicator and show invoice
-        loadingIndicator.style.display = 'none';
-        invoiceContainer.style.display = 'block';
-      } catch (error) {
-        console.error('Error loading invoice:', error);
-        showError('Failed to load invoice: ' + error.message);
-      }
-    }
-    
-    // Update UI with invoice data
-    function updateInvoiceUI(invoice, user, packageData) {
-      // Update invoice details
-      invoiceNumber.textContent = invoice.id;
-      invoiceDate.textContent = formatDate(invoice.date);
-      dueDate.textContent = formatDate(invoice.dueDate);
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const invoiceElement = document.getElementById('invoiceContainer');
       
-      // Update status
-      if (invoice.status === 'Paid') {
-        invoiceStatus.textContent = 'PAID';
-        invoiceStatus.className = 'status-paid';
-      } else {
-        invoiceStatus.textContent = 'UNPAID';
-        invoiceStatus.className = 'status-unpaid';
-      }
-      
-      // Update customer details
-      customerName.textContent = user.name;
-      customerPhone.textContent = user.phone || 'N/A';
-      customerEmail.textContent = user.email || 'N/A';
-      customerAddress.textContent = user.address || 'N/A';
-      
-      // Update package details
-      packageName.textContent = packageData.name;
-      billingPeriod.textContent = `${formatDate(invoice.date)} - ${formatDate(invoice.dueDate)}`;
-      packageAmount.textContent = formatCurrency(invoice.amount);
-      
-      // Update total
-      totalAmount.textContent = formatCurrency(invoice.amount);
-    }
-    
-    // Format date
-    function formatDate(timestamp) {
-      if (!timestamp) return 'N/A';
-      
-      let date;
-      if (timestamp.seconds) {
-        // Handle Firestore timestamp
-        date = new Date(timestamp.seconds * 1000);
-      } else {
-        date = new Date(timestamp);
-      }
-      
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    }
-    
-    // Format currency
-    function formatCurrency(amount) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'PKR'
-      }).format(amount);
-    }
-    
-    // Print invoice
-    function printInvoice() {
-      window.print();
-    }
-    
-    // Download invoice as PDF
-    async function downloadInvoice() {
-      try {
-        // Show loading indicator
-        loadingIndicator.style.display = 'block';
-        invoiceContainer.style.display = 'none';
-        
-        // Get invoice element
-        const invoice = document.getElementById('invoiceContainer');
-        invoice.style.display = 'block'; // Make it visible for capture
-        
-        // Create PDF using html2canvas and jsPDF
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'pt', 'a4');
-        
-        // Capture the invoice as an image
-        const canvas = await html2canvas(invoice, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true
-        });
-        
-        // Add image to PDF
+      html2canvas(invoiceElement).then(canvas => {
         const imgData = canvas.toDataURL('image/png');
-        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
         
-        doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`invoice-${invoiceId}.pdf`);
+      });
+    });
+
+    if (invoiceId) {
+      fetchInvoiceDetails(invoiceId);
+    } else {
+      showError('No invoice ID provided.');
+    }
+
+    async function fetchInvoiceDetails(id) {
+      try {
+        // Query for the invoice using the formattedId
+        const invoicesRef = collection(db, "invoices");
+        const q = query(invoicesRef, where("formattedId", "==", id));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          showError(`Invoice with ID ${id} not found.`);
+          return;
+        }
         
-        // Save PDF
-        const urlParams = new URLSearchParams(window.location.search);
-        const invoiceId = urlParams.get('id');
-        doc.save(`Invoice-${invoiceId}.pdf`);
+        // Assuming formattedId is unique, so we take the first result
+        const invoiceDoc = querySnapshot.docs[0];
+        const invoice = invoiceDoc.data();
+
+        // Debug logging for invoice data
+        console.log('Invoice data:', invoice);
+        console.log('CreatedAt type:', invoice.createdAt ? typeof invoice.createdAt : 'undefined');
+        if (invoice.createdAt) {
+          console.log('CreatedAt value:', invoice.createdAt);
+          console.log('Has toDate method:', typeof invoice.createdAt.toDate === 'function');
+        }
         
-        // Hide loading indicator and show invoice again
-        loadingIndicator.style.display = 'none';
-        invoiceContainer.style.display = 'block';
+        // Populate invoice details
+        document.getElementById('invoiceNumber').textContent = invoice.formattedId || id;
+        
+        // Try multiple methods to get a valid date
+        let invoiceDate = null;
+        
+        // Method 1: Try using Firestore Timestamp's toDate method
+        if (invoice.createdAt && typeof invoice.createdAt.toDate === 'function') {
+          invoiceDate = invoice.createdAt.toDate();
+          console.log('Using toDate() method, result:', invoiceDate);
+        } 
+        // Method 2: Try using seconds or milliseconds timestamp
+        else if (invoice.createdAt) {
+          const seconds = invoice.createdAt.seconds || invoice.createdAt._seconds;
+          if (seconds) {
+            invoiceDate = new Date(seconds * 1000);
+            console.log('Using seconds timestamp, result:', invoiceDate);
+          } else if (typeof invoice.createdAt === 'number') {
+            // If it's a very large number, treat as milliseconds, otherwise as seconds
+            invoiceDate = invoice.createdAt > 32503680000 
+              ? new Date(invoice.createdAt) 
+              : new Date(invoice.createdAt * 1000);
+            console.log('Using numeric timestamp, result:', invoiceDate);
+          } else if (typeof invoice.createdAt === 'string') {
+            invoiceDate = new Date(invoice.createdAt);
+            console.log('Using string date, result:', invoiceDate);
+          }
+        }
+        
+        // Method 3: Try using dueDate if createdAt failed
+        if (!invoiceDate && invoice.dueDate) {
+          if (typeof invoice.dueDate.toDate === 'function') {
+            invoiceDate = invoice.dueDate.toDate();
+            console.log('Using dueDate.toDate(), result:', invoiceDate);
+          } else {
+            const seconds = invoice.dueDate.seconds || invoice.dueDate._seconds;
+            if (seconds) {
+              invoiceDate = new Date(seconds * 1000);
+              console.log('Using dueDate seconds, result:', invoiceDate);
+            } else if (typeof invoice.dueDate === 'number') {
+              invoiceDate = invoice.dueDate > 32503680000 
+                ? new Date(invoice.dueDate) 
+                : new Date(invoice.dueDate * 1000);
+              console.log('Using dueDate numeric timestamp, result:', invoiceDate);
+            }
+          }
+        }
+        
+        // Method 4: Derive from invoice ID (YYYYMM format)
+        if (!invoiceDate && invoice.formattedId && invoice.formattedId.length >= 6) {
+          const yr = invoice.formattedId.substring(0,4);
+          const mo = invoice.formattedId.substring(4,6);
+          const derivedDate = new Date(`${yr}-${mo}-01`);
+          console.log('Trying to derive date from ID:', yr, mo, derivedDate);
+          if (!isNaN(derivedDate.getTime())) {
+            invoiceDate = derivedDate;
+          }
+        }
+        
+        // Method 5: Use URL provided date as final fallback
+        if (!invoiceDate && urlProvidedDate && !isNaN(urlProvidedDate.getTime())) {
+          console.log('Using URL provided date as fallback');
+          invoiceDate = urlProvidedDate;
+        }
+        
+        console.log('Final invoice date:', invoiceDate);
+        document.getElementById('invoiceDate').textContent = invoiceDate ? invoiceDate.toLocaleDateString() : 'N/A';
+        
+        // Handle due date
+        let dueDate = null;
+        if (invoice.dueDate) {
+          if (typeof invoice.dueDate.toDate === 'function') {
+            dueDate = invoice.dueDate.toDate();
+          } else {
+            const seconds = invoice.dueDate.seconds || invoice.dueDate._seconds;
+            if (seconds) {
+              dueDate = new Date(seconds * 1000);
+            } else if (typeof invoice.dueDate === 'number') {
+              dueDate = invoice.dueDate > 32503680000 
+                ? new Date(invoice.dueDate) 
+                : new Date(invoice.dueDate * 1000);
+            } else if (typeof invoice.dueDate === 'string') {
+              dueDate = new Date(invoice.dueDate);
+            }
+          }
+        }
+        document.getElementById('dueDate').textContent = dueDate ? dueDate.toLocaleDateString() : 'N/A';
+        
+        // Customer details
+        document.getElementById('customerName').textContent = invoice.customerName || 'Customer Name';
+        document.getElementById('customerPhone').textContent = invoice.customerPhone || '';
+        document.getElementById('customerEmail').textContent = invoice.customerEmail || '';
+        document.getElementById('customerAddress').textContent = invoice.customerAddress || '';
+
+        // Package details
+        document.getElementById('packageName').textContent = invoice.packageName || 'Service';
+        document.getElementById('billingPeriod').textContent = invoice.period || 'N/A';
+        document.getElementById('packageAmount').textContent = `PKR ${parseFloat(invoice.amount || 0).toFixed(2)}`;
+
+        // Total amount
+        document.getElementById('totalAmount').textContent = `PKR ${parseFloat(invoice.amount || 0).toFixed(2)}`;
+
+        // Update payment status
+        document.getElementById('invoiceStatus').textContent = invoice.status || 'Due';
+        document.getElementById('invoiceStatus').className = `status-${(invoice.status || 'unpaid').toLowerCase()}`;
+        
+        // Show paid stamp if paid
+        if (invoice.status && invoice.status.toLowerCase() === 'paid') {
+          document.getElementById('paidStamp').style.display = 'block';
+        }
+        
+        // Show the invoice container and hide loading indicator
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('invoiceContainer').style.display = 'block';
+
       } catch (error) {
-        console.error('Error downloading invoice:', error);
-        showError('Failed to download invoice: ' + error.message);
-        
-        // Hide loading indicator
-        loadingIndicator.style.display = 'none';
-        invoiceContainer.style.display = 'block';
+        console.error("Error fetching invoice details: ", error);
+        showError('Error loading invoice details.');
       }
     }
     
-    // Show error message
+    // Helper function to show errors
     function showError(message) {
-      loadingIndicator.style.display = 'none';
-      errorContainer.style.display = 'block';
+      document.getElementById('loadingIndicator').style.display = 'none';
+      const errorContainer = document.getElementById('errorContainer');
       errorContainer.textContent = message;
+      errorContainer.style.display = 'block';
     }
   </script>
 </body>

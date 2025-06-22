@@ -11,11 +11,11 @@
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-app-compat.js?v=1.2"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore-compat.js?v=1.2"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   <!-- jsPDF for PDF generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js?v=1.2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js?v=1.2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -323,11 +323,7 @@
     <p>&copy; 2023 WeCloud Internet Services. All rights reserved.</p>
   </footer>
 
-  <script type="module">
-    // Import Firebase modules
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js?v=1.2";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js?v=1.2";
-
+  <script>
     // Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAExSaJx0_YU_ZkXcGqkAiDtgljo8cPJRQ",
@@ -340,8 +336,8 @@
     };
 
     // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
     // Get invoice ID from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -387,9 +383,7 @@
     async function fetchInvoiceDetails(id) {
       try {
         // Query for the invoice using the formattedId
-        const invoicesRef = collection(db, "invoices");
-        const q = query(invoicesRef, where("formattedId", "==", id));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await db.collection("invoices").where("formattedId", "==", id).get();
 
         if (querySnapshot.empty) {
           showError(`Invoice with ID ${id} not found.`);

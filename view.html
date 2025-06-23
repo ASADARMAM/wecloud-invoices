@@ -322,7 +322,7 @@
   <script type="module">
     // Import Firebase modules
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore.js";
 
     // Your web app's Firebase configuration
     const firebaseConfig = {
@@ -419,20 +419,28 @@
           document.getElementById('dueDate').textContent = 'N/A';
         }
         
-        // Customer details
-        document.getElementById('customerName').textContent = invoice.customerName || 'Customer';
-        if (invoice.customerPhone) {
-          document.getElementById('customerPhone').textContent = invoice.customerPhone;
-        }
-        if (invoice.customerEmail) {
-          document.getElementById('customerEmail').textContent = invoice.customerEmail;
-        }
-        if (invoice.customerAddress) {
-          document.getElementById('customerAddress').textContent = invoice.customerAddress;
+        // Fetch and populate customer details
+        const userRef = doc(db, 'users', invoice.userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          document.getElementById('customerName').textContent = userData.name || '';
+          document.getElementById('customerPhone').textContent = userData.phone || '';
+          document.getElementById('customerEmail').textContent = userData.email || '';
+          document.getElementById('customerAddress').textContent = userData.address || '';
+        } else {
+          document.getElementById('customerName').textContent = 'Customer';
         }
 
-        // Package details
-        document.getElementById('packageName').textContent = invoice.packageName || 'Internet Service';
+        // Fetch and populate package details
+        const pkgRef = doc(db, 'packages', invoice.packageId);
+        const pkgSnap = await getDoc(pkgRef);
+        if (pkgSnap.exists()) {
+          const pkgData = pkgSnap.data();
+          document.getElementById('packageName').textContent = pkgData.name || '';
+        } else {
+          document.getElementById('packageName').textContent = 'Internet Service';
+        }
         
         // Billing period
         let billingPeriod = 'N/A';
